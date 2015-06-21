@@ -13,7 +13,7 @@ proc downloadAndParse(url: string): tuple[res:seq[Video], count:int] =
         var regexp = re"""(?s)<div class="news_type_video.*?href="(.*?)".*?title="(.*?)".*?<img src="(.*?).*?<span class="author">.*?title="(.*?)".*?<p>\s*(.*?)</p>"""
 
         type State = enum
-                Out, InDiv, UrlDone, TitleDone, ImageDone, DescriptionStart
+                Out, InDiv, UrlDone, TitleDone, ImageDone, AuthorStart, AuthorDone, DescriptionStart
         var count = 0
         var state = Out
 
@@ -37,7 +37,17 @@ proc downloadAndParse(url: string): tuple[res:seq[Video], count:int] =
                         image = ln.match(re""".*<img.*?src="(.*?)"""").get.captures[0]
                         state = ImageDone
                         continue
-                if state == ImageDone and ln.match(re""".*<p>""").isSome == true:
+
+                if state == ImageDone and ln.match(re""".*<span.*?class="author"""").isSome == true:
+                        state = AuthorStart
+                        continue
+
+                if state == AuthorStart and ln.match(re""".*title="(.*?)"""").isSome == true:
+                        state = AuthorDone
+                        author = ln.match(re""".*title="(.*?)"""").get.captures[0]
+                        continue
+
+                if state == AuthorDone and ln.match(re""".*<p>""").isSome == true:
                         state = DescriptionStart
                         description = ""
                         continue
@@ -45,7 +55,7 @@ proc downloadAndParse(url: string): tuple[res:seq[Video], count:int] =
                 if state == DescriptionStart:
                         if ln.match(re""".*</p>""").isSome == true:
                                 state = Out
-                                var v:Video = (title, url, image, "", description)
+                                var v:Video = (title, url, image, author, description)
                                 res.add(v)
                                 count = count + 1
                                 continue
@@ -74,6 +84,7 @@ while true:
         total = concat(total, s)
         totalCount = totalCount + count
         index = intToStr(totalCount)
+        quit()
 
 
 
